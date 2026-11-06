@@ -1,6 +1,11 @@
 from flask import Flask, request, redirect, url_for, render_template_string
+import urllib.parse
+import os
 
 app = Flask(__name__)
+
+COACH_WHATSAPP = "254746150576"
+MPESA_NUMBER = "0746150576"
 
 sessions = [
     {"id": 1, "title": "1-on-1 Life Coaching", "desc": "Personal coaching to help you get clarity, set goals and take action in your life.", "price": "KES 3,000", "duration": "60 mins"},
@@ -24,6 +29,7 @@ HTML = """
         .hero h1 { font-size: 48px; color: #ffcc00; margin: 0; }
         .hero h2 { font-size: 22px; }
         .btn { background: #ffcc00; color: black; padding: 15px 30px; text-decoration: none; font-weight: bold; border-radius: 8px; display: inline-block; margin-top: 15px; }
+        .wa-btn { background: #25D366; color: white; padding: 15px 30px; text-decoration: none; font-weight: bold; border-radius: 8px; display: inline-block; margin-top: 15px; }
         .section { background: white; color: #111; padding: 40px 20px; max-width: 900px; margin: 20px auto; border-radius: 12px; }
         .card { background: #f8f8f8; border: 1px solid #ddd; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
         .card h3 { margin-top: 0; }
@@ -31,7 +37,9 @@ HTML = """
         input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         button { background: #ffcc00; border: none; padding: 15px; width: 100%; font-weight: bold; font-size: 16px; border-radius: 6px; cursor: pointer; }
         .tennis-box { background: #e8f5e9; border-left: 5px solid green; padding: 15px; border-radius: 8px; margin-top: 15px; }
+        .mpesa-box { background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center; }
         .footer { text-align: center; padding: 30px; color: #ccc; }
+        .success-box { background: #e8f5e9; padding: 25px; border-radius: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -39,7 +47,8 @@ HTML = """
         <h1>COACH SOLOMON</h1>
         <h2>Your Coach. Your Growth. Your Next Level.</h2>
         <p>Rongai, Nairobi | Online Worldwide | 5.0 Stars</p>
-        <a class="btn" href="#sessions">Book A Session</a>
+        <a class="btn" href="#sessions">Book A Session</a><br>
+        <a class="wa-btn" href="https://wa.me/254746150576?text=Hi%20Coach%20Solomon%2C%20I%20want%20to%20book%20a%20session" target="_blank">Chat on WhatsApp</a>
     </div>
 
     <div class="section">
@@ -56,6 +65,11 @@ HTML = """
             Muthale Academy<br>
             Or at your preferred location - I come to you!</p>
             <p>Private 1-on-1 tennis lessons, group lessons, and kids coaching available.</p>
+        </div>
+        <div class="mpesa-box">
+            <b>Pay via M-Pesa</b><br>
+            Send to: <b>0746150576</b> - Solomon<br>
+            Send screenshot on WhatsApp after payment
         </div>
     </div>
 
@@ -97,9 +111,26 @@ HTML = """
 
     <div class="footer">
         <p>Coach Solomon | Rongai, Nairobi | Tennis in Karen, Absa Ground, Muthale Academy and Your Location</p>
+        <p>WhatsApp: 0746150576 | M-Pesa: 0746150576</p>
     </div>
 </body>
 </html>
+"""
+
+SUCCESS_HTML = """
+<!DOCTYPE html>
+<html>
+<head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Booking Received</title>
+<style>body{font-family:Arial;background:#0a0f2e;margin:0;padding:20px} .box{max-width:500px;margin:auto;background:white;padding:25px;border-radius:12px;text-align:center;color:#111} .wa-btn{display:block;background:#25D366;color:white;padding:16px;border-radius:10px;text-decoration:none;font-weight:bold;margin-top:20px} .back{display:block;margin-top:15px;color:#111}</style>
+</head>
+<body><div class="box">
+<h2>Booking Received!</h2>
+<p><b>{{ name }}</b><br>{{ session_title }}<br>{{ location }}<br>{{ phone }}</p>
+<p>Tap below to confirm on WhatsApp so Coach Solomon sees it instantly:</p>
+<a class="wa-btn" href="{{ wa_link }}" target="_blank">Confirm on WhatsApp</a>
+<p style="margin-top:20px;">Step 2: Pay via M-Pesa to <b>0746150576</b><br>Then send screenshot on WhatsApp</p>
+<a class="back" href="/">Back to Home</a>
+</div></body></html>
 """
 
 @app.route('/')
@@ -110,13 +141,15 @@ def home():
 def book():
     session_id = int(request.form.get('session_id'))
     session = next((s for s in sessions if s['id'] == session_id), None)
-    registrations.append({
-        'name': request.form.get('name'),
-        'phone': request.form.get('phone'),
-        'location': request.form.get('location'),
-        'session_title': session['title'] if session else 'Unknown'
-    })
-    return redirect(url_for('home'))
+    name = request.form.get('name')
+    phone = request.form.get('phone')
+    location = request.form.get('location')
+    session_title = session['title'] if session else 'Unknown'
+    registrations.append({'name': name, 'phone': phone, 'location': location, 'session_title': session_title})
+    message = "Hi Coach Solomon, I just booked! Name: " + str(name) + " Phone: " + str(phone) + " Session: " + str(session_title) + " Location: " + str(location) + " Please confirm. I will send M-Pesa screenshot."
+    wa_link = "https://wa.me/" + COACH_WHATSAPP + "?text=" + urllib.parse.quote(message)
+    return render_template_string(SUCCESS_HTML, name=name, phone=phone, location=location, session_title=session_title, wa_link=wa_link)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=True)
